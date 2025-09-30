@@ -1,0 +1,44 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy Docker App
+      run: |
+        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          cd ~/hello-app || mkdir ~/hello-app && cd ~/hello-app
+
+          # Replace app.py
+          echo "from flask import Flask
+app = Flask(__name__)
+@app.route('/')
+def hello():
+    return 'Hello from GitHub Actions on EC2!'
+app.run(host='0.0.0.0', port=5000)" > app.py
+
+          # Replace Dockerfile
+          echo "FROM python:3.8-slim
+RUN pip install flask
+COPY app.py /app.py
+CMD [\\"python\\", \\"app.py\\"]" > Dockerfile
+
+          docker build -t hello-app .
+          docker rm -f hello-app || true
+          docker run -d -p 5000:5000 --name hello-app hello-app
+        EOF
