@@ -19,21 +19,24 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Deploy Docker App
+    - name: Deploy to EC2 and run Docker app
       run: |
         ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd ~/hello-app || mkdir ~/hello-app && cd ~/hello-app
+          mkdir -p ~/hello-app
+          cd ~/hello-app
 
-          cat > app.py << EOPY
+          cat <<EOPY > app.py
 from flask import Flask
 app = Flask(__name__)
+
 @app.route('/')
 def hello():
     return "Hello from GitHub Actions on EC2!"
+
 app.run(host='0.0.0.0', port=5000)
 EOPY
 
-          cat > Dockerfile << EOFY
+          cat <<EOFY > Dockerfile
 FROM python:3.8-slim
 RUN pip install flask
 COPY app.py /app.py
