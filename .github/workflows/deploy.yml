@@ -1,21 +1,34 @@
-name: Deploy to EC2 via Docker
+name: Build and Deploy to EC2
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t myapp .
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Build image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/myapp:latest .
+
+      - name: Push image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/myapp:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -23,8 +36,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            docker pull myapp || true
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/myapp:latest
             docker stop myapp || true
             docker rm myapp || true
-            docker build -t myapp /home/ec2-user/myapp
-            docker run -d -p 80:80 --name myapp myapp
+            docker run -d -p 80:80 --name myapp ${{ secrets.DOCKERHUB_USERNAME }}/myapp:latest
