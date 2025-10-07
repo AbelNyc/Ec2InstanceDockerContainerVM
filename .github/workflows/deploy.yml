@@ -1,49 +1,30 @@
-name: Deploy to EC2
+name: Deploy to EC2 via Docker
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Set up SSH
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+      - name: Build Docker image
+        run: docker build -t myapp .
 
-    - name: Deploy to EC2 and run Docker app
-      run: |
-        ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          mkdir -p ~/hello-app
-          cd ~/hello-app
-
-          cat <<EOPY > app.py
-from flask import Flask
-app = Flask(__name__)
-
-@app.route('/')
-def hello():
-    return "Hello from GitHub Actions on EC2!"
-
-app.run(host='0.0.0.0', port=5000)
-EOPY
-
-          cat <<EOFY > Dockerfile
-FROM python:3.8-slim
-RUN pip install flask
-COPY app.py /app.py
-CMD ["python", "app.py"]
-EOFY
-
-          docker build -t hello-app .
-          docker rm -f hello-app || true
-          docker run -d -p 5000:5000 --name hello-app hello-app
-        EOF
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull myapp || true
+            docker stop myapp || true
+            docker rm myapp || true
+            docker build -t myapp /home/ec2-user/myapp
+            docker run -d -p 80:80 --name myapp myapp
