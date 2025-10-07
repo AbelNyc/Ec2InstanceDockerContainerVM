@@ -70,14 +70,6 @@ Added a GitHub Actions workflow at `.github/workflows/deploy.yml` to automate:
 
 ---
 
-## 🚀 Next Steps (Future Improvements)
-- Migrate Docker Hub → **AWS ECR** for private image storage  
-- Add **staging vs production** environment branching  
-- Integrate **monitoring and logging** (CloudWatch / Grafana)  
-- Optionally move deployment to **ECS or EKS** for orchestration  
-
----
-
 ### 💡 Summary
 This setup enables:
 - Automated builds on each push  
